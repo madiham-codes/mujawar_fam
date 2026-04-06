@@ -4876,7 +4876,50 @@ var FamilyTree = function (e, t) {
             e.margin && e.margin[3] < 2 && (e.margin[3] = 2),
             this._draw(!1, FamilyTree.action.exporting, r, function (r, a) {
                 var n = document.createElement('div');
-                if (((n.innerHTML = r), e.padding > 0)) {
+                // populate temp container with SVG/html export content
+                n.innerHTML = r;
+
+                // For PDF/PNG exports normalize oversized SVG text so output isn't
+                // visually squashed. This only changes the export content.
+                try {
+                    if (e.ext === 'pdf' || e.ext === 'png') {
+                        var svgs = n.querySelectorAll('svg');
+                        for (var si = 0; si < svgs.length; si++) {
+                            var svg = svgs[si];
+                            var texts = svg.querySelectorAll('text');
+                            for (var ti = 0; ti < texts.length; ti++) {
+                                var tx = texts[ti];
+                                // set inline style to ensure server-side/pdf conversion respects it
+                                var old = tx.getAttribute('style') || '';
+                                // only override if it's excessively large
+                                var fs = tx.getAttribute('font-size') || '';
+                                if (fs) {
+                                    try {
+                                        var fsv = parseFloat(fs);
+                                        if (!isNaN(fsv) && fsv > 30) {
+                                            old = old + ';font-size:12px;';
+                                        }
+                                    } catch (ex) {}
+                                } else {
+                                    // apply reasonable default
+                                    old = old + ';font-size:12px;';
+                                }
+                                old = old + ';font-weight:600;';
+                                tx.setAttribute('style', old);
+                            }
+                            var tspans = svg.querySelectorAll('tspan');
+                            for (var tsi = 0; tsi < tspans.length; tsi++) {
+                                var tsp = tspans[tsi];
+                                var old2 = tsp.getAttribute('style') || '';
+                                old2 =
+                                    old2 + ';font-size:12px;font-weight:600;';
+                                tsp.setAttribute('style', old2);
+                            }
+                        }
+                    }
+                } catch (err) {}
+
+                if (e.padding > 0) {
                     var o = n.querySelector('svg'),
                         l = FamilyTree._getViewBox(o);
                     ((l[0] -= e.padding),
@@ -4904,7 +4947,9 @@ var FamilyTree = function (e, t) {
                             ]),
                             c = i.element.querySelector('[data-bft-styles]');
                         if (
-                            (c && (s.styles += c.outerHTML),
+                            (c &&
+                                (s.styles =
+                                    (c.outerHTML || '') + (s.styles || '')),
                             s.styles &&
                                 (n.childNodes[0].insertAdjacentHTML(
                                     'afterbegin',
@@ -4940,7 +4985,12 @@ var FamilyTree = function (e, t) {
                                 a,
                             ]),
                             l = i.element.querySelector('[data-bft-styles]');
-                        if ((l && (a.styles += l.outerHTML), !1 === o))
+                        if (
+                            (l &&
+                                (a.styles =
+                                    (l.outerHTML || '') + (a.styles || '')),
+                            !1 === o)
+                        )
                             return !1;
                         (t || FamilyTree.loading.show(i),
                             t ?
